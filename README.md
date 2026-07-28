@@ -61,17 +61,21 @@ const log = createAppLogger({
 
 ## Publish (maintainers)
 
-1. Create the **`@qldc`** organization on [npmjs.com](https://www.npmjs.com) (one-time) and add publishers.
-2. Create GitHub repo `QLDC-BS/km-logger` and push this project.
-3. Add repo secret **`NPM_TOKEN`** (npm automation token with publish rights on `@qldc`).
-4. Bump version, then either:
-   - push a tag `v0.1.0` (Actions publishes), or
-   - `npm publish` locally while logged in.
+CI uses **npm Trusted Publishing** (OIDC) — no long-lived `NPM_TOKEN`.
+
+1. On [npmjs.com](https://www.npmjs.com/package/@qldc/logger) → **Settings → Trusted Publisher**:
+   - Organization or user: `QLDC-BS`
+   - Repository: `km-logger`
+   - Workflow filename: `publish.yml` (name only, not a path)
+   - Environment: leave blank
+2. Bump version and push a tag; Actions publishes:
 
 ```bash
 npm version patch   # or minor / major
 git push --follow-tags
 ```
+
+A `404` on `PUT …/@qldc%2flogger` from Actions almost always means auth failed (missing Trusted Publisher config, or an empty `NODE_AUTH_TOKEN` / bad classic token). Local `npm publish` still needs a granular token with **Bypass 2FA** (or interactive 2FA).
 
 ## Scripts
 
