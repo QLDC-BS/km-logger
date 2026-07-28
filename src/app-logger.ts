@@ -30,7 +30,22 @@ export type CreateAppLoggerOptions = {
   labels?: ServiceLabels;
   /** Write log lines here. Default: process.stdout. */
   stdout?: NodeJS.WritableStream;
+  /**
+   * When true, emit Azure App Service Always On / loopback `GET /` access lines.
+   * Default: `false` (those pings are skipped).
+   */
+  includeKeepAlive?: boolean;
 };
+
+/**
+ * Azure App Service Always On / ARR keep-alive access lines, e.g.
+ * `http_request GET / 200 0.11ms 127.0.0.1:6531 -`
+ */
+export function isAzureKeepAliveAccessLine(message: string): boolean {
+  return /^http_request GET \/ 200 \d+(?:\.\d+)?ms 127\.0\.0\.1(?::\d+)?(?:\s|$)/.test(
+    message,
+  );
+}
 
 function formatError(message: string, err?: unknown): string {
   if (err === undefined) return message;
@@ -43,12 +58,17 @@ function formatError(message: string, err?: unknown): string {
 export function createAppLogger(options: CreateAppLoggerOptions = {}): AppLogger {
   const defaultService = options.defaultService ?? "app";
   const stdout = options.stdout ?? process.stdout;
+  const includeKeepAlive = options.includeKeepAlive === true;
 
   const emit = (
     level: "INFO" | "WARN" | "ERROR",
     message: string,
     ctx: LogContext | undefined,
   ): void => {
+    if (!includeKeepAlive && isAzureKeepAliveAccessLine(message)) {
+      return;
+    }
+
     stdout.write(`${message}\n`);
 
     const grafana =

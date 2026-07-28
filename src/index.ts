@@ -1,6 +1,7 @@
 export {
   createAppLogger,
   getAppLogger,
+  isAzureKeepAliveAccessLine,
   resetAppLoggerForTests,
   type AppLogger,
   type CreateAppLoggerOptions,

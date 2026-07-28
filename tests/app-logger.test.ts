@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createAppLogger,
   getAppLogger,
+  isAzureKeepAliveAccessLine,
   resetAppLoggerForTests,
 } from "../src/app-logger.js";
 
@@ -79,6 +80,64 @@ describe("createAppLogger", () => {
     logger.error("failed", new Error("boom"));
     expect(chunks[0]).toContain("failed");
     expect(chunks[0]).toContain("boom");
+  });
+
+  it("skips Azure keep-alive access lines by default", () => {
+    const chunks: string[] = [];
+    const logger = createAppLogger({
+      grafana: null,
+      stdout: {
+        write(chunk: string) {
+          chunks.push(chunk);
+          return true;
+        },
+      } as NodeJS.WritableStream,
+    });
+
+    logger.info("http_request GET / 200 0.11ms 127.0.0.1:6531 -", {
+      module: "access_log",
+    });
+    logger.info("http_request GET /api/foo 200 1ms 127.0.0.1:6531 -");
+    expect(chunks).toEqual(["http_request GET /api/foo 200 1ms 127.0.0.1:6531 -\n"]);
+  });
+
+  it("logs keep-alive lines when includeKeepAlive is true", () => {
+    const chunks: string[] = [];
+    const line = "http_request GET / 200 0.15ms 127.0.0.1:6533 -";
+    const logger = createAppLogger({
+      includeKeepAlive: true,
+      grafana: null,
+      stdout: {
+        write(chunk: string) {
+          chunks.push(chunk);
+          return true;
+        },
+      } as NodeJS.WritableStream,
+    });
+
+    logger.info(line);
+    expect(chunks).toEqual([`${line}\n`]);
+  });
+});
+
+describe("isAzureKeepAliveAccessLine", () => {
+  it("matches loopback GET / access lines", () => {
+    expect(
+      isAzureKeepAliveAccessLine("http_request GET / 200 0.11ms 127.0.0.1:6531 -"),
+    ).toBe(true);
+    expect(
+      isAzureKeepAliveAccessLine("http_request GET / 200 0.24ms 127.0.0.1 -"),
+    ).toBe(true);
+  });
+
+  it("does not match other traffic", () => {
+    expect(
+      isAzureKeepAliveAccessLine("http_request GET /healthz 200 1ms 127.0.0.1:1 -"),
+    ).toBe(false);
+    expect(
+      isAzureKeepAliveAccessLine("http_request GET / 200 1ms 10.0.0.5 -"),
+    ).toBe(false);
+    expect(isAzureKeepAliveAccessLine("started")).toBe(false);
   });
 });
 

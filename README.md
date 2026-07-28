@@ -40,6 +40,15 @@ import { createAppLogger } from "@qldc/logger";
 const log = createAppLogger({ defaultService: "km-downer" });
 ```
 
+Azure App Service Always On pings (`http_request GET / … 127.0.0.1…`) are **skipped by default**. Opt in if you need them:
+
+```ts
+const log = createAppLogger({
+  defaultService: "km-web-api",
+  includeKeepAlive: true,
+});
+```
+
 ## Environment
 
 | Variable | Purpose |
