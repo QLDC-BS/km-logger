@@ -1,6 +1,6 @@
 {
   "name": "@qldc/logger",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Shared stdout + optional Grafana Loki logger for Node services",
   "type": "module",
   "main": "./dist/index.js",
