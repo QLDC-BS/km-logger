@@ -1,5 +1,5 @@
 /**
- * Grafana Loki push (same wire format as Flask `libs/logger.py` GrafanaHTTPHandler).
+ * Grafana Loki push (same wire format as a typical Loki HTTP push handler).
  */
 
 export type LokiStreamLabels = Record<string, string>;

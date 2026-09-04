@@ -1,9 +1,9 @@
 # Publish @qldc/logger to the public npm registry on version tags (v*).
 #
 # Uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret required.
-# Configure once on npmjs.com → @qldc/logger → Settings → Trusted Publisher:
-#   Organization or user: QLDC-BS
-#   Repository:           km-logger
+# Configure once on npmjs.com → package → Settings → Trusted Publisher:
+#   Organization or user: (GitHub org that owns this repo)
+#   Repository:           (this repository name)
 #   Workflow filename:    publish.yml
 #   Environment:          (leave blank)
 

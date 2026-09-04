@@ -143,7 +143,7 @@ describe("isAzureKeepAliveAccessLine", () => {
 
 describe("getAppLogger", () => {
   it("returns the same singleton instance", () => {
-    const a = getAppLogger({ defaultService: "km-web-api", grafana: null });
+    const a = getAppLogger({ defaultService: "my-api", grafana: null });
     const b = getAppLogger();
     expect(a).toBe(b);
   });

@@ -31,14 +31,14 @@ export type CreateAppLoggerOptions = {
   /** Write log lines here. Default: process.stdout. */
   stdout?: NodeJS.WritableStream;
   /**
-   * When true, emit Azure App Service Always On / loopback `GET /` access lines.
-   * Default: `false` (those pings are skipped).
-   */
+ * When true, emit loopback keep-alive / health-probe access lines.
+ * Default: `false` (those pings are skipped).
+ */
   includeKeepAlive?: boolean;
 };
 
 /**
- * Azure App Service Always On / ARR keep-alive access lines, e.g.
+ * Loopback keep-alive access lines, e.g.
  * `http_request GET / 200 0.11ms 127.0.0.1:6531 -`
  */
 export function isAzureKeepAliveAccessLine(message: string): boolean {
@@ -105,7 +105,7 @@ let singleton: AppLogger | null = null;
 
 /**
  * Process-wide singleton. Pass `defaultService` on first call if `NAME` may be unset
- * (e.g. `"km-web-api"`). Later calls ignore options and return the existing instance.
+ * (e.g. `"my-api"`). Later calls ignore options and return the existing instance.
  */
 export function getAppLogger(options?: CreateAppLoggerOptions): AppLogger {
   if (singleton) return singleton;

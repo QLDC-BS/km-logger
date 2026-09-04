@@ -34,17 +34,17 @@ describe("readGrafanaPushEnv", () => {
 
 describe("readServiceLabels", () => {
   it("uses NAME and ENV", () => {
-    process.env.NAME = "km-edocs-api";
+    process.env.NAME = "my-service";
     process.env.ENV = "dev";
     expect(readServiceLabels()).toEqual({
-      service: "km-edocs-api",
+      service: "my-service",
       environment: "dev",
     });
   });
 
   it("falls back to defaultService when NAME is unset", () => {
-    expect(readServiceLabels(process.env, "km-web-api")).toEqual({
-      service: "km-web-api",
+    expect(readServiceLabels(process.env, "my-api")).toEqual({
+      service: "my-api",
       environment: "unknown",
     });
   });
