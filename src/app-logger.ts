@@ -47,6 +47,14 @@ export function isAzureKeepAliveAccessLine(message: string): boolean {
   );
 }
 
+/**
+ * Access lines with an HTTP 5xx status, e.g.
+ * `http_request GET /api/foo 500 12.3ms 10.0.0.5 -`
+ */
+export function isHttp5xxAccessLine(message: string): boolean {
+  return /^http_request \S+ .+ 5\d\d \d+(?:\.\d+)?ms(?:\s|$)/.test(message);
+}
+
 function formatError(message: string, err?: unknown): string {
   if (err === undefined) return message;
   if (err instanceof Error) {
@@ -61,13 +69,18 @@ export function createAppLogger(options: CreateAppLoggerOptions = {}): AppLogger
   const includeKeepAlive = options.includeKeepAlive === true;
 
   const emit = (
-    level: "INFO" | "WARN" | "ERROR",
+    requestedLevel: "INFO" | "WARN" | "ERROR",
     message: string,
     ctx: LogContext | undefined,
   ): void => {
     if (!includeKeepAlive && isAzureKeepAliveAccessLine(message)) {
       return;
     }
+
+    const level: "INFO" | "WARN" | "ERROR" =
+      requestedLevel !== "ERROR" && isHttp5xxAccessLine(message)
+        ? "ERROR"
+        : requestedLevel;
 
     stdout.write(`${message}\n`);
 

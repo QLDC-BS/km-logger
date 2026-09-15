@@ -3,6 +3,7 @@ import {
   createAppLogger,
   getAppLogger,
   isAzureKeepAliveAccessLine,
+  isHttp5xxAccessLine,
   resetAppLoggerForTests,
 } from "../src/app-logger.js";
 
@@ -117,6 +118,52 @@ describe("createAppLogger", () => {
 
     logger.info(line);
     expect(chunks).toEqual([`${line}\n`]);
+  });
+
+  it("pushes 5xx access lines to Loki as ERROR even when info() is used", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const logger = createAppLogger({
+      grafana: {
+        url: "https://logs.example/loki/api/v1/push",
+        userId: "1",
+        apiKey: "key",
+      },
+      labels: { service: "km-test", environment: "prod" },
+      stdout: { write: () => true } as NodeJS.WritableStream,
+    });
+
+    logger.info("http_request GET /api/foo 500 12.3ms 10.0.0.5 -", {
+      module: "access_log",
+    });
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as {
+      streams: [{ stream: Record<string, string>; values: [string, string][] }];
+    };
+    expect(body.streams[0]!.stream.level).toBe("ERROR");
+    expect(body.streams[0]!.values[0]![1]).toContain(" 500 ");
+  });
+});
+
+describe("isHttp5xxAccessLine", () => {
+  it("matches 5xx access lines", () => {
+    expect(isHttp5xxAccessLine("http_request GET /api/foo 500 1.2ms 10.0.0.5 -")).toBe(
+      true,
+    );
+    expect(isHttp5xxAccessLine("http_request POST /jobs 503 12ms 10.0.0.5 0")).toBe(true);
+  });
+
+  it("does not match other statuses or non-access lines", () => {
+    expect(isHttp5xxAccessLine("http_request GET /api/foo 200 1ms 10.0.0.5 -")).toBe(
+      false,
+    );
+    expect(isHttp5xxAccessLine("http_request GET /api/foo 404 1ms 10.0.0.5 -")).toBe(
+      false,
+    );
+    expect(isHttp5xxAccessLine("Unhandled exception in request handler")).toBe(false);
   });
 });
 
