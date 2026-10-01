@@ -46,12 +46,13 @@ describe("createAppLogger", () => {
         apiKey: "key",
       },
       labels: { service: "km-test", environment: "local" },
-      stdout: { write: () => true } as NodeJS.WritableStream,
+      stdout: { write: () => true } as unknown as NodeJS.WritableStream,
     });
 
     logger.warn("careful", { module: "jobs", function: "run" });
 
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await logger.flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as {
       streams: [{ stream: Record<string, string>; values: [string, string][] }];
@@ -131,20 +132,52 @@ describe("createAppLogger", () => {
         apiKey: "key",
       },
       labels: { service: "km-test", environment: "prod" },
-      stdout: { write: () => true } as NodeJS.WritableStream,
+      stdout: { write: () => true } as unknown as NodeJS.WritableStream,
     });
 
     logger.info("http_request GET /api/foo 500 12.3ms 10.0.0.5 -", {
       module: "access_log",
     });
 
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await logger.flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as {
       streams: [{ stream: Record<string, string>; values: [string, string][] }];
     };
     expect(body.streams[0]!.stream.level).toBe("ERROR");
     expect(body.streams[0]!.values[0]![1]).toContain(" 500 ");
+  });
+
+  it("batches lines from several calls into one Loki push", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const logger = createAppLogger({
+      grafana: {
+        url: "https://logs.example/loki/api/v1/push",
+        userId: "1",
+        apiKey: "key",
+      },
+      labels: { service: "km-test", environment: "prod" },
+      stdout: { write: () => true } as unknown as NodeJS.WritableStream,
+    });
+
+    logger.info("one");
+    logger.info("two");
+    logger.warn("three");
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await logger.flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as {
+      streams: { stream: Record<string, string>; values: [string, string][] }[];
+    };
+    const byLevel = Object.fromEntries(
+      body.streams.map((s) => [s.stream.level, s.values.map(([, line]) => line)]),
+    );
+    expect(byLevel).toEqual({ INFO: ["one", "two"], WARN: ["three"] });
   });
 });
 

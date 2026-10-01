@@ -3,10 +3,11 @@
  */
 
 import {
-  pushLokiLine,
+  createLokiBatcher,
   readGrafanaPushEnv,
   readServiceLabels,
   type GrafanaPushEnv,
+  type LokiBatchOptions,
   type ServiceLabels,
 } from "./loki.js";
 
@@ -19,6 +20,8 @@ export type AppLogger = {
   info(message: string, ctx?: LogContext): void;
   warn(message: string, ctx?: LogContext): void;
   error(message: string, err?: unknown, ctx?: LogContext): void;
+  /** Push buffered Loki lines now (e.g. in a shutdown handler). Never rejects. */
+  flush(): Promise<void>;
 };
 
 export type CreateAppLoggerOptions = {
@@ -35,6 +38,8 @@ export type CreateAppLoggerOptions = {
  * Default: `false` (those pings are skipped).
  */
   includeKeepAlive?: boolean;
+  /** Loki batching limits. */
+  lokiBatch?: LokiBatchOptions;
 };
 
 /**
@@ -67,6 +72,7 @@ export function createAppLogger(options: CreateAppLoggerOptions = {}): AppLogger
   const defaultService = options.defaultService ?? "app";
   const stdout = options.stdout ?? process.stdout;
   const includeKeepAlive = options.includeKeepAlive === true;
+  const batcher = createLokiBatcher(options.lokiBatch);
 
   const emit = (
     requestedLevel: "INFO" | "WARN" | "ERROR",
@@ -98,7 +104,7 @@ export function createAppLogger(options: CreateAppLoggerOptions = {}): AppLogger
     if (ctx?.module) labels.module = ctx.module;
     if (ctx?.function) labels.function = ctx.function;
 
-    pushLokiLine(grafana.url, grafana.userId, grafana.apiKey, labels, message);
+    batcher.enqueue(grafana, labels, message);
   };
 
   return {
@@ -110,6 +116,9 @@ export function createAppLogger(options: CreateAppLoggerOptions = {}): AppLogger
     },
     error(message, err, ctx) {
       emit("ERROR", formatError(message, err), ctx);
+    },
+    flush() {
+      return batcher.flush();
     },
   };
 }

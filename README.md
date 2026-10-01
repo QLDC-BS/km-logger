@@ -2,7 +2,7 @@
 
 Shared stdout + optional Grafana Loki logger for Node services.
 
-Writes a plain message line to stdout, and when Grafana env is set, fire-and-forget pushes the same line to Loki with `level` / `service` / `environment` labels.
+Writes a plain message line to stdout, and when Grafana env is set, pushes the same line to Loki with `level` / `service` / `environment` labels. Loki pushes are batched (see [Loki batching](#loki-batching)).
 
 ## Install
 
@@ -48,6 +48,26 @@ Loopback keep-alive access lines (`http_request GET / … 127.0.0.1…`) are **s
 const log = createAppLogger({
   defaultService: "my-api",
   includeKeepAlive: true,
+});
+```
+
+## Loki batching
+
+Lines are buffered and pushed in one request per second (or as soon as 200 lines are waiting), grouped into one stream per label set. Only one push is in flight at a time. If Loki is slow or unreachable, the buffer is capped at 5000 lines; further lines are dropped from Loki (stdout still gets them) and the drop count is written to stderr.
+
+```ts
+const log = createAppLogger({
+  defaultService: "my-api",
+  lokiBatch: { flushIntervalMs: 1000, maxBatchLines: 200, maxBufferedLines: 5000 },
+});
+```
+
+Up to `flushIntervalMs` of Loki lines can be lost if the process exits abruptly. To send them on a graceful shutdown, call `flush()`:
+
+```ts
+process.on("SIGTERM", async () => {
+  await log.flush();
+  process.exit(0);
 });
 ```
 
